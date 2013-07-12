@@ -1,7 +1,7 @@
 econnect
 ========
 
-This is a social network concept of educational website. 
+This is a social networking concept of educational website. 
 
 <h3>Technologies Used:</h3>
 
