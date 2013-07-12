@@ -1,9 +1,9 @@
 {
 	"DATABASE1" :
 					{
-						"DATABASE_NAME" :  "education_connect",
+						"DATABASE_NAME" :  "users_info",
 						"TABLES"        :   {
-													"USERS" : "user_detail",
+													"USERS" : "user_data",
 													"LOGIN" : "login_info",
 													"UNREGISTERED" : "unregistered_user"
 											}

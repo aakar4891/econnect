@@ -5,7 +5,11 @@
 		require_once $root.'config/classes/RegistrationInfo.class.php';
 
 		$registrationObj = new RegistrationInfo();
-		$registrationObj->setRegistrationData($_POST['username'], $_POST['firstname'], $_POST['lastname'], $_POST['email'], $_POST['password'], $_POST['gender'], $_POST['date'].'-'.$_POST['month'].'-'.$_POST['year']);
+		if($registrationObj->setRegistrationDataAndInsertInDatabase($_POST['username'], $_POST['firstname'], $_POST['lastname'], $_POST['email'], $_POST['password'], $_POST['gender'], $_POST['date'].'-'.$_POST['month'].'-'.$_POST['year'])){
+			echo 'mydone';
+		}else{
+			echo $registrationObj->message;
+		}
 
 	}else{
 

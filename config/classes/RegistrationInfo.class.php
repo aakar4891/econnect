@@ -4,7 +4,7 @@ require_once 'ConnectionToDb.class.php';
 class RegistrationInfo extends ConnectionToDb
 {
 	//const $root = $_SERVER['DOCUMENT_ROOT'].'/econnect/';
-	private $registration_info = array("USERNAME" => "",
+	private $registrationInfo = array("USERNAME" => "",
 										"FIRST_NAME" => "",
 										"LAST_NAME" => "",
 										"EMAIL" => "",
@@ -15,12 +15,16 @@ class RegistrationInfo extends ConnectionToDb
 										"DATE_TIME" => "",
 										"TOKEN" => "");
 	
-	public $message, $database, $tables;
+	public $message;
+
+	private $myTables, $pdoObj; 
 
 	function __construct()
 	{
-		$this->setDatabaseInfo();
-		$this->connectDb($this->database);
+		$databaseNo = 1;
+		$infoReceived = $this->setDatabaseInfoAndConnectDb($databaseNo);
+		$this->myTables = $infoReceived[0]; //Collecting table names
+		$this->pdoObj = $infoReceived[1]; //Fetching PDO information
 	}
 
 	function __destruct()
@@ -28,23 +32,14 @@ class RegistrationInfo extends ConnectionToDb
 		$this->disconnectDb();
 	}
 
-	function setDatabaseInfo(){
-		$table_json = @file_get_contents('config/databases.json');
-		$database_info = json_decode($table_json, true);
-		$json_root = $database_info["DATABASE1"];
-
-		$this->database = $json_root["DATABASE_NAME"];
-		$this->tables = $json_root["TABLES"];
-		print_r($this->tables);
-
-	}
+	
 
 	//$username is trimmed input. Please make it sure.
 	private function setUsername($username)
 	{	
 		if(preg_match("/^[a-zA-Z0-9]+$/", $username) && $username != "")
 		{
-			$this->registration_info["USERNAME"] = $username;
+			$this->registrationInfo["USERNAME"] = $username;
 			return true;
 		}
 		else
@@ -57,7 +52,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[a-zA-Z]+$/", $firstname) && $firstname != "")
 		{
-			$this->registration_info["FIRST_NAME"] = $firstname;
+			$this->registrationInfo["FIRST_NAME"] = $firstname;
 			return true;
 		}
 		else
@@ -70,7 +65,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[a-zA-Z]+$/", $lastname) && $lastname != "")
 		{
-			$this->registration_info["LAST_NAME"] = $lastname;
+			$this->registrationInfo["LAST_NAME"] = $lastname;
 			return true;
 		}
 		else
@@ -83,7 +78,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[a-zA-Z0-9._]+[@][a-zA-Z0-9]+[.]([a-zA-Z]{2,4}|[a-zA-Z]{2}[.][a-zA-Z]{2,4})$/", $email) && $email != "")
 		{
-			$this->registration_info["EMAIL"] = $email;
+			$this->registrationInfo["EMAIL"] = $email;
 			return true;
 		}
 		else
@@ -96,7 +91,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[a-zA-Z]+$/", $gender) && $gender != "")
 		{
-			$this->registration_info["GENDER"] = $gender;
+			$this->registrationInfo["GENDER"] = $gender;
 			return true;
 		}
 		else
@@ -109,7 +104,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[0-9]{1,2}[-][a-z]{3,4}[-][0-9]{1,2}$/", $dob))
 		{
-			$this->registration_info["DOB"] = $dob;
+			$this->registrationInfo["DOB"] = $dob;
 			return true;
 		}
 		else
@@ -122,7 +117,7 @@ class RegistrationInfo extends ConnectionToDb
 	{	
 		if(preg_match("/^[a-zA-Z0-9!@#$%^&*()_+]+$/", $password) && $password != "")
 		{
-			$this->registration_info["PASSWORD"] = $this->passwordEncrypt($password);
+			$this->registrationInfo["PASSWORD"] = $this->passwordEncrypt($password);
 			return true;
 		}
 		else
@@ -133,13 +128,13 @@ class RegistrationInfo extends ConnectionToDb
 
 	private function setIP()
 	{
-		$this->registration_info["IP_ADDRESS"] = $_SERVER["REMOTE_ADDR"];
+		$this->registrationInfo["IP_ADDRESS"] = $_SERVER["REMOTE_ADDR"];
 		return true;
 	}
 
 	private function setDateTime()
 	{
-		$this->registration_info["DATE_TIME"] = date("Y-m-d H:i:s");
+		$this->registrationInfo["DATE_TIME"] = date("Y-m-d H:i:s");
 		return true;
 	}
 
@@ -164,16 +159,42 @@ class RegistrationInfo extends ConnectionToDb
 
 	private function setOneTimeURL(){
 
-		$this->registration_info["TOKEN"] = SHA1($this->registration_info["EMAIL"].str_shuffle($this->registration_info["USERNAME"]));
+		$this->registrationInfo["TOKEN"] = SHA1($this->registrationInfo["EMAIL"].str_shuffle($this->registrationInfo["USERNAME"]));
 	}
 	
 
 	private function insertDataInDatabase(){
 
+		try{
+			$dbh = $this->pdoObj;
+			$dbh->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING );
+			$query = "INSERT INTO user_data SET first = :first, lastname = :last, gender = :gen, dob = :dob, registration_ip = :ip, date_time = :date";
+			$stmt = $dbh->prepare($query);
+
+			$stmt->bindParam(':first', $this->registrationInfo["FIRST_NAME"]);
+			$stmt->bindParam(':last', $this->registrationInfo["LAST_NAME"]);
+			$stmt->bindParam(':gen', $this->registrationInfo["GENDER"]);
+			$stmt->bindParam(':dob', $this->registrationInfo["DOB"]);
+			$stmt->bindParam(':ip', $this->registrationInfo["IP_ADDRESS"]);
+			$stmt->bindParam(':date', $this->registrationInfo["DATE_TIME"]);
+
+			@$stmt->execute();
+			$error = $stmt->errorInfo();
+			if($errorMessage !== "NULL"){
+				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: " . $error[2].PHP_EOL, FILE_APPEND);
+				echo "Query Error: " . $error[2];
+			}
+			
+		} catch (PDOException $exception){
+			file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: " . $exception->getMessage().PHP_EOL, FILE_APPEND);
+			echo "Connection error: " . $exception->getMessage();
+		}
+		
+
 	}
 
 
-	function setRegistrationData($username, $firstname, $lastname, $email, $password, $gender, $dob)
+	function setRegistrationDataAndInsertInDatabase($username, $firstname, $lastname, $email, $password, $gender, $dob)
 	{
 		if(!$this->setUsername(trim($username)))
 		{
@@ -279,7 +300,9 @@ class RegistrationInfo extends ConnectionToDb
 		$this->setOneTimeURL();
 
 		$this->message = "Data Successfully Updated!";
-		return true;	
+		$this->insertDataInDatabase();
+		return true;
+
 	}
 }
 
