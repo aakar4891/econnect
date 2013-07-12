@@ -1,0 +1,20 @@
+{
+	"DATABASE1" :
+					{
+						"DATABASE_NAME" :  "education_connect",
+						"TABLES"        :   {
+													"USERS" : "user_detail",
+													"LOGIN" : "login_info",
+													"UNREGISTERED" : "unregistered_user"
+											}
+					},
+	"DATABASE2" :
+					{
+						"DATABASE_NAME" :  "database_2",
+						"TABLES"        :   {
+													"USERS" : "user_detail",
+													"LOGIN" : "login_info",
+													"UNREGISTERED" : "unregistered_user"
+											}
+					}
+}
