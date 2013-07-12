@@ -3,8 +3,8 @@ econnect
 
 This is a social network concept of educational website. 
 
-Technologies Used:
-------------------
+<h3>Technologies Used:</h3>
+
 
 1.) PHP : Object Oriented Programming. <br/>
 2.) PDO for database interaction.<br/>
