@@ -102,7 +102,7 @@ class RegistrationInfo extends ConnectionToDb
 
 	private function setDOB($dob)
 	{	
-		if(preg_match("/^[0-9]{1,2}[-][a-z]{3,4}[-][0-9]{1,2}$/", $dob))
+		if(preg_match("/^[0-9]{1,2}[-][a-z]{3,5}[-][0-9]{4}$/", $dob))
 		{
 			$this->registrationInfo["DOB"] = $dob;
 			return true;
@@ -165,10 +165,51 @@ class RegistrationInfo extends ConnectionToDb
 
 	private function insertDataInDatabase(){
 
-		try{
 			$dbh = $this->pdoObj;
 			$dbh->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING );
-			$query = "INSERT INTO user_data SET first = :first, lastname = :last, gender = :gen, dob = :dob, registration_ip = :ip, date_time = :date";
+
+			$query = "SELECT * FROM `".$this->myTables["LOGIN"]."` WHERE `username` = '".$this->registrationInfo["USERNAME"]."' OR `email` = '".$this->registrationInfo["EMAIL"]."'";
+			$stmt = $dbh->prepare($query);
+
+			@$stmt->execute();
+			$error = $stmt->errorInfo();
+
+			if($error[2] !== NULL){
+				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: (Table: " . $this->myTables["LOGIN"] . ")" . $error[2].PHP_EOL, FILE_APPEND);
+				$this->message = "Query Error: " . $error[2];
+				return false;
+			}elseif($stmt->rowCount() >= 1){
+				$this->message = 'This email is already registered!';
+				return false;
+			}
+
+			//Starting transaction... for table entry in login, users, unregistered.
+			$dbh->beginTransaction();
+
+			//Inserting in `login` table
+			$query = "INSERT INTO `".$this->myTables["LOGIN"]."` SET `username` = :user, `email` = :email, `password` = :pass, `last_ip` = :last_ip, `status` = 'inactive'";
+			$stmt = $dbh->prepare($query);
+
+			$stmt->bindParam(':user', $this->registrationInfo["USERNAME"]);
+			$stmt->bindParam(':email', $this->registrationInfo["EMAIL"]);
+			$stmt->bindParam(':pass', $this->registrationInfo["PASSWORD"]);
+			$stmt->bindParam(':last_ip', $this->registrationInfo["IP_ADDRESS"]);
+
+			@$stmt->execute();
+			$error = $stmt->errorInfo();
+			if($error[2] !== NULL){
+				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: (Table: " . $this->myTables["LOGIN"] . ")" . $error[2].PHP_EOL, FILE_APPEND);
+				$this->message = "Query Error: " . $error[2];
+				$dbh->rollBack();
+				//After rolling back autoincrement needed to be deducted.
+				$query = "ALTER TABLE `".$this->myTables["LOGIN"]."` AUTO_INCREMENT = 1";
+				$stmt = $dbh->prepare($query);
+				$stmt->execute();				
+				return false;
+			}
+
+			//Inserting in `users` table
+			$query = "INSERT INTO `".$this->myTables["USERS"]."` SET `firstname` = :first, `lastname` = :last, `gender` = :gen, `dob` = :dob, `registration_ip` = :ip, `date_time` = :date";
 			$stmt = $dbh->prepare($query);
 
 			$stmt->bindParam(':first', $this->registrationInfo["FIRST_NAME"]);
@@ -180,17 +221,40 @@ class RegistrationInfo extends ConnectionToDb
 
 			@$stmt->execute();
 			$error = $stmt->errorInfo();
-			if($errorMessage !== "NULL"){
-				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: " . $error[2].PHP_EOL, FILE_APPEND);
-				echo "Query Error: " . $error[2];
-			}
-			
-		} catch (PDOException $exception){
-			file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: " . $exception->getMessage().PHP_EOL, FILE_APPEND);
-			echo "Connection error: " . $exception->getMessage();
-		}
-		
+			if($error[2] !== NULL){
+				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: (Table: " . $this->myTables["USERS"] . ")" . $error[2].PHP_EOL, FILE_APPEND);
+				$this->message = "Query Error: " . $error[2];
+				$dbh->rollBack();
 
+				//After rolling back autoincrement needed to be deducted.
+				$query = "ALTER TABLE `".$this->myTables["USERS"]."` AUTO_INCREMENT = 1";
+				$stmt = $dbh->prepare($query);
+				$stmt->execute();
+				return false;
+			}
+
+			//Inserting in `users` table
+			$query = "INSERT INTO `".$this->myTables["UNREGISTERED"]."` SET `token` = :token";
+			$stmt = $dbh->prepare($query);
+
+			$stmt->bindParam(':token', $this->registrationInfo["TOKEN"]);			
+
+			@$stmt->execute();
+			$error = $stmt->errorInfo();
+			if($error[2] !== NULL){
+				file_put_contents($this->root."/config/logs/dberror.log", "Date: " . date('M j Y - G:i:s') . " ---- Error: (Table: " . $this->myTables["USERS"] . ")" . $error[2].PHP_EOL, FILE_APPEND);
+				$this->message = "Query Error: " . $error[2];
+				$dbh->rollBack();
+
+				//After rolling back autoincrement needed to be deducted.
+				$query = "ALTER TABLE `".$this->myTables["UNREGISTERED"]."` AUTO_INCREMENT = 1";
+				$stmt = $dbh->prepare($query);
+				$stmt->execute();
+				return false;
+			}
+
+			$dbh->commit();
+			return true;
 	}
 
 
@@ -300,7 +364,9 @@ class RegistrationInfo extends ConnectionToDb
 		$this->setOneTimeURL();
 
 		$this->message = "Data Successfully Updated!";
-		$this->insertDataInDatabase();
+		if(!$this->insertDataInDatabase()){
+			echo $this->message;
+		}
 		return true;
 
 	}
