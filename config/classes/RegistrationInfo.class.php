@@ -12,7 +12,6 @@ class RegistrationInfo extends ConnectionToDb
 										"GENDER" => "",
 										"DOB" => "",
 										"IP_ADDRESS" => "",
-										"DATE_TIME" => "",
 										"TOKEN" => "");
 	
 	public $message;
@@ -132,12 +131,6 @@ class RegistrationInfo extends ConnectionToDb
 		return true;
 	}
 
-	private function setDateTime()
-	{
-		$this->registrationInfo["DATE_TIME"] = date("Y-m-d H:i:s");
-		return true;
-	}
-
 	private function passwordEncrypt($password)
 	{
 		//Salts
@@ -187,7 +180,8 @@ class RegistrationInfo extends ConnectionToDb
 			$dbh->beginTransaction();
 
 			//Inserting in `login` table
-			$query = "INSERT INTO `".$this->myTables["LOGIN"]."` SET `username` = :user, `email` = :email, `password` = :pass, `last_ip` = :last_ip, `status` = 'inactive'";
+			//Last login date is set through sql NOW() function.
+			$query = "INSERT INTO `".$this->myTables["LOGIN"]."` SET `username` = :user, `email` = :email, `password` = :pass, `last_ip` = :last_ip, `last_login_date` = NOW(),`status` = 'inactive'";
 			$stmt = $dbh->prepare($query);
 
 			$stmt->bindParam(':user', $this->registrationInfo["USERNAME"]);
@@ -209,7 +203,8 @@ class RegistrationInfo extends ConnectionToDb
 			}
 
 			//Inserting in `users` table
-			$query = "INSERT INTO `".$this->myTables["USERS"]."` SET `firstname` = :first, `lastname` = :last, `gender` = :gen, `dob` = :dob, `registration_ip` = :ip, `date_time` = :date";
+			//Date time is set through sql NOW() function.
+			$query = "INSERT INTO `".$this->myTables["USERS"]."` SET `firstname` = :first, `lastname` = :last, `gender` = :gen, `dob` = :dob, `registration_ip` = :ip, `date_time` = NOW()";
 			$stmt = $dbh->prepare($query);
 
 			$stmt->bindParam(':first', $this->registrationInfo["FIRST_NAME"]);
@@ -217,7 +212,6 @@ class RegistrationInfo extends ConnectionToDb
 			$stmt->bindParam(':gen', $this->registrationInfo["GENDER"]);
 			$stmt->bindParam(':dob', $this->registrationInfo["DOB"]);
 			$stmt->bindParam(':ip', $this->registrationInfo["IP_ADDRESS"]);
-			$stmt->bindParam(':date', $this->registrationInfo["DATE_TIME"]);
 
 			@$stmt->execute();
 			$error = $stmt->errorInfo();
@@ -360,7 +354,6 @@ class RegistrationInfo extends ConnectionToDb
 		}
 
 		$this->setIP();
-		$this->setDateTime();
 		$this->setOneTimeURL();
 
 		$this->message = "Data Successfully Updated!";
